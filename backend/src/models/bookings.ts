@@ -1,44 +1,53 @@
-import { Request, Response } from 'express';
-import { convertDbBooking } from '../utils';
-import db from '../db';
+import { z } from 'zod';
+import { BookingStatus } from '../types/booking';
 
-import { Booking, BookingSql } from '../types/booking';
+/** A UUID */
+const Id = z.string().uuid();
 
-const getAllBookings = (req: Request, res: Response) => {
-  const getAllSql = `SELECT * FROM bookings`;
+/** A UTC datetime string, formatted as YYYY-MM-DDThh:mm:ssZ */
+const ISO8601DateTime = z
+  .string()
+  .refine((str) => !isNaN(Date.parse(str)), {
+    message: 'Invalid date format',
+  })
+  .transform((str) => new Date(str));
 
-  db.all(getAllSql, [], (err, rows: BookingSql[]) => {
-    if (err) {
-      console.log(
-        `[error] Error while getting all the bookings: ${err.message}`
-      );
-      res.status(500).json({
-        status: 500,
-        message: 'Error while getting all the bookings from the database',
-        data: [],
-      });
-      return;
-    }
+// booking_status table schema
+export const BookingStatusSchema = z.nativeEnum(BookingStatus);
 
-    // No data in the database
-    if (!rows || rows.length === 0) {
-      console.log(`[info] No data in the bookings table`);
-      res.status(404).json({
-        status: 404,
-        message: 'No data in the bookings table',
-        data: [],
-      });
-      return;
-    }
+// bookings table schema
+export const BookingSchema = z.object({
+  id: Id,
+  createdAt: ISO8601DateTime,
+  updatedAt: ISO8601DateTime,
+  orgId: Id,
+  status: BookingStatusSchema,
+  contact: z.object({
+    name: z.string().min(2),
+    email: z.string().email(),
+  }),
+  event: z.object({
+    title: z.string().min(3),
+    locationId: ISO8601DateTime,
+    end: ISO8601DateTime,
+    details: z.string().max(500),
+  }),
+  requestNote: z.string().optional(),
+});
 
-    const data: Booking[] = rows.map((row) => convertDbBooking(row));
-
-    res.status(200).json({
-      status: 200,
-      message: `All data from bookings table retrieved`,
-      data,
-    });
-  });
-};
-
-export { getAllBookings };
+// schema for db output
+export const BookingSqlSchema = z.object({
+  id: Id,
+  created_at: ISO8601DateTime,
+  updated_at: ISO8601DateTime,
+  org_id: Id,
+  status_id: BookingStatusSchema,
+  contact_name: z.string().min(2),
+  contact_email: z.string().email(),
+  event_title: z.string().min(3),
+  event_location_id: Id,
+  event_start: ISO8601DateTime,
+  event_end: ISO8601DateTime,
+  event_details: z.string().max(500),
+  request_note: z.string().nullable(),
+});

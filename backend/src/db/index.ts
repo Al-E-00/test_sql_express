@@ -31,8 +31,8 @@ const createTables = async () => {
     // Create bookings table
     await dbRun(`CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       org_id TEXT NOT NULL,
       status_id INTEGER NOT NULL,
       contact_name TEXT NOT NULL,
