@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { convertDbBooking } from '../utils';
-import { validate as isValidUUID } from 'uuid';
+import { z } from 'zod';
 
 import db from '../db';
 
 import { Booking, BookingSql } from '../types/booking';
+import { Id } from '../models/bookings';
 
 // GET bookings
 const getAllBookings = (req: Request, res: Response) => {
@@ -48,13 +49,16 @@ const getAllBookings = (req: Request, res: Response) => {
 const getBooking = (req: Request, res: Response) => {
   const { id } = req.params;
 
-  // Validation of the id parameter
-  if (!id || isNaN(Number(id))) {
-    console.log(`[error] Invalid booking id: ${id}`);
+  const parseResult = Id.safeParse(id);
+
+  if (!parseResult.success) {
+    console.log(
+      `[error] Failed to parse booking ID: ${id}, error: ${parseResult.error.message}`
+    );
     res.status(400).json({
       status: 400,
-      message: `Invalid id provided`,
-      data: [],
+      message: `Invalid booking ID format`,
+      data: null,
     });
     return;
   }

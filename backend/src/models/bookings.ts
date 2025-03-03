@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { BookingStatus } from '../types/booking';
 
 /** A UUID */
-const Id = z.string().uuid();
+export const Id = z.string().uuid();
 
 /** A UTC datetime string, formatted as YYYY-MM-DDThh:mm:ssZ */
 const ISO8601DateTime = z
