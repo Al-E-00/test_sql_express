@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
-import { convertDbBooking } from '../utils';
-import { z } from 'zod';
+import { convertDbBooking, handleValidationError } from '../utils';
+import { v4 as uuidv4 } from 'uuid';
 
 import db from '../db';
 
-import { Booking, BookingSql } from '../types/booking';
-import { Id } from '../models/bookings';
+import { Booking, BookingSql, BookingStatus } from '../types/booking';
+import { BookingInputSchema, Id } from '../models/bookings';
+import { z } from 'zod';
 
 // GET bookings
 const getAllBookings = (req: Request, res: Response) => {
@@ -47,75 +48,76 @@ const getAllBookings = (req: Request, res: Response) => {
 
 // GET booking
 const getBooking = (req: Request, res: Response) => {
+  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
   const { id } = req.params;
 
-  const parseResult = Id.safeParse(id);
+  try {
+    const parsedId = Id.parse(id);
 
-  if (!parseResult.success) {
-    console.log(
-      `[error] Failed to parse booking ID: ${id}, error: ${parseResult.error.message}`
-    );
-    res.status(400).json({
-      status: 400,
-      message: `Invalid booking ID format`,
+    db.get(getBookingSql, [parsedId], (err, row: BookingSql) => {
+      if (err) {
+        console.log(
+          `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
+        );
+        res.status(500).json({
+          status: 500,
+          message: `Error while getting booking id: ${id}`,
+          data: [],
+        });
+        return;
+      }
+
+      if (!row) {
+        console.log(`[info] The booking id: ${id} does not exist`);
+        res.status(404).json({
+          status: 404,
+          message: `No data for the booking id: ${id}`,
+          data: [],
+        });
+        return;
+      }
+
+      const data = convertDbBooking(row);
+
+      res.status(200).json({
+        status: 200,
+        message: `Retrieved data for booking id ${id}`,
+        data,
+      });
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      console.log(
+        `[error] Error while validating id: ${Object.values(
+          handleValidationError(err)
+        )}`
+      );
+
+      res.status(400).json({
+        status: 400,
+        message: `Error while validating id: ${Object.values(
+          handleValidationError(err)
+        )}`,
+        data: null,
+      });
+      return;
+    }
+
+    console.log(`[error] Database error ${err}`);
+
+    res.status(500).json({
+      status: 500,
+      message: `Database error `,
       data: null,
     });
     return;
   }
-
-  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
-
-  db.get(getBookingSql, [id], (err, row: BookingSql) => {
-    if (err) {
-      console.log(
-        `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
-      );
-      res.status(500).json({
-        status: 500,
-        message: `Error while getting booking id: ${id}`,
-        data: [],
-      });
-      return;
-    }
-
-    if (!row) {
-      console.log(`[info] The booking id: ${id} does not exist`);
-      res.status(404).json({
-        status: 404,
-        message: `No data for the booking id: ${id}`,
-        data: [],
-      });
-      return;
-    }
-
-    const data = convertDbBooking(row);
-
-    res.status(200).json({
-      status: 200,
-      message: `Retrieved data for booking id ${id}`,
-      data,
-    });
-  });
 };
 
-/* export interface BookingSql {
-  id: Id;
-  created_at: ISO8601DateTime;
-  updated_at: ISO8601DateTime;
-  org_id: Id;
-  status_id: BookingStatus;
-  contact_name: string;
-  contact_email: string;
-  event_title: string;
-  event_location_id: Id;
-  event_start: ISO8601DateTime;
-  event_end: ISO8601DateTime;
-  event_details: string;
-  request_note: string | null;
-} */
 // POST booking
 const addBooking = (req: Request, res: Response) => {
   const addBookingSql = `INSERT INTO bookings (
+    id,
     org_id,
     status_id,
     contact_name,
@@ -126,19 +128,75 @@ const addBooking = (req: Request, res: Response) => {
     event_end,
     event_details,
     request_note
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  const {
-    org_id,
-    contact_name,
-    contact_email,
-    event_title,
-    event_location_id,
-    event_start,
-    event_end,
-    event_details,
-    request_note,
-  } = req.body;
+  try {
+    const id = uuidv4();
+    const org_id = uuidv4();
+    const event_location_id = uuidv4();
+
+    const event_start = new Date(req.body.event_start).toISOString();
+    const event_end = new Date(req.body.event_end).toISOString();
+
+    const bookingData = {
+      id: id,
+      org_id: org_id,
+      status_id: BookingStatus.PENDING,
+      contact_name: req.body.contact_name,
+      contact_email: req.body.contact_email,
+      event_title: req.body.event_title,
+      event_location_id: event_location_id,
+      event_start: event_start,
+      event_end: event_end,
+      event_details: req.body.event_details,
+      request_note: req.body.request_note,
+    };
+
+    const safeBookingData = BookingInputSchema.parse(bookingData);
+
+    db.run(addBookingSql, [...Object.values(safeBookingData)], (err) => {
+      if (err) {
+        console.log(
+          `[error] Error while adding a new booking, error: ${err.message}`
+        );
+        res.status(500).json({
+          status: 500,
+          message: `Error while adding a new booking`,
+          data: null,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 200,
+        message: `Added a new booking`,
+        data: safeBookingData,
+      });
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      console.log(
+        `[error] Error with parsing the booking data: ${JSON.stringify(
+          handleValidationError(err)
+        )}`
+      );
+      res.status(400).json({
+        status: 400,
+        message: `Error while adding the fields ${JSON.stringify(
+          handleValidationError(err)
+        )}`,
+        data: null,
+      });
+      return;
+    }
+
+    console.log(`[error] Error with adding the booking data, ${err}`);
+    res.status(500).json({
+      status: 500,
+      message: `Error while adding the booking data`,
+      data: null,
+    });
+  }
 };
 
-export { getAllBookings, getBooking };
+export { getAllBookings, getBooking, addBooking };

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Booking, BookingSql } from '../types/booking';
 
 const convertDbBooking = (row: BookingSql): Booking => ({
@@ -23,4 +24,16 @@ const convertDbBooking = (row: BookingSql): Booking => ({
       : row.request_note,
 });
 
-export { convertDbBooking };
+// Utility function for handling validation errors
+const handleValidationError = (error: z.ZodError) => {
+  // User-friendly error structure
+  return error.errors.reduce((acc, curr) => {
+    const path = curr.path.join(',');
+    return {
+      ...acc,
+      [path]: curr.message,
+    };
+  }, {});
+};
+
+export { convertDbBooking, handleValidationError };
