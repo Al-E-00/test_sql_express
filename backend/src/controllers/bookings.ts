@@ -139,15 +139,15 @@ const addBooking = (req: Request, res: Response) => {
     const event_end = new Date(req.body.event_end).toISOString();
 
     const bookingData = {
-      id: id,
-      org_id: org_id,
+      id,
+      org_id,
       status_id: BookingStatus.PENDING,
       contact_name: req.body.contact_name,
       contact_email: req.body.contact_email,
       event_title: req.body.event_title,
-      event_location_id: event_location_id,
-      event_start: event_start,
-      event_end: event_end,
+      event_location_id,
+      event_start,
+      event_end,
       event_details: req.body.event_details,
       request_note: req.body.request_note,
     };
@@ -156,9 +156,7 @@ const addBooking = (req: Request, res: Response) => {
 
     db.run(addBookingSql, [...Object.values(safeBookingData)], (err) => {
       if (err) {
-        console.log(
-          `[error] Error while adding a new booking, error: ${err.message}`
-        );
+        console.log(`[error] Error while adding a new booking: ${err.message}`);
         res.status(500).json({
           status: 500,
           message: `Error while adding a new booking`,
@@ -176,13 +174,13 @@ const addBooking = (req: Request, res: Response) => {
   } catch (err) {
     if (err instanceof z.ZodError) {
       console.log(
-        `[error] Error with parsing the booking data: ${JSON.stringify(
+        `[error] Validation error: ${JSON.stringify(
           handleValidationError(err)
         )}`
       );
       res.status(400).json({
         status: 400,
-        message: `Error while adding the fields ${JSON.stringify(
+        message: `Validation error: ${JSON.stringify(
           handleValidationError(err)
         )}`,
         data: null,
@@ -190,10 +188,10 @@ const addBooking = (req: Request, res: Response) => {
       return;
     }
 
-    console.log(`[error] Error with adding the booking data, ${err}`);
+    console.log(`[error] Unexpected error: ${err}`);
     res.status(500).json({
       status: 500,
-      message: `Error while adding the booking data`,
+      message: `Unexpected error occurred`,
       data: null,
     });
   }
