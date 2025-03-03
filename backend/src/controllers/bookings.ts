@@ -86,16 +86,17 @@ const getBooking = (req: Request, res: Response) => {
       });
     });
   } catch (err) {
+    // Handle zod errors
     if (err instanceof z.ZodError) {
       console.log(
-        `[error] Error while validating id: ${Object.values(
+        `[error] Error while validating id: ${JSON.stringify(
           handleValidationError(err)
         )}`
       );
 
       res.status(400).json({
         status: 400,
-        message: `Error while validating id: ${Object.values(
+        message: `Error while validating id: ${JSON.stringify(
           handleValidationError(err)
         )}`,
         data: null,
@@ -172,6 +173,7 @@ const addBooking = (req: Request, res: Response) => {
       });
     });
   } catch (err) {
+    // Handle zod errors
     if (err instanceof z.ZodError) {
       console.log(
         `[error] Validation error: ${JSON.stringify(
@@ -197,4 +199,68 @@ const addBooking = (req: Request, res: Response) => {
   }
 };
 
-export { getAllBookings, getBooking, addBooking };
+// DELETE booking
+const deleteBooking = (req: Request, res: Response) => {
+  const deleteSql = `DELETE FROM bookings WHERE id = ?`;
+
+  try {
+    const { id } = req.params;
+    const parsedId = Id.parse(id);
+
+    db.run(deleteSql, [parsedId], function (err) {
+      if (err) {
+        console.log(`[error] Error while deleting the booking id ${id}`);
+        res.status(500).json({
+          status: 500,
+          message: `Error while deleting booking id ${id}`,
+          data: null,
+        });
+        return;
+      }
+
+      if (this.changes === 0) {
+        console.log(`[info] No booking id ${id} found`);
+
+        res.status(404).json({
+          status: 404,
+          message: `No booking id ${id} found`,
+          data: null,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: 200,
+        message: `Booking id ${id} deleted`,
+        data: null,
+      });
+    });
+  } catch (err) {
+    // Handle zod errors
+    if (err instanceof z.ZodError) {
+      console.log(
+        `[error] Error while validating id for booking delete: ${JSON.stringify(
+          handleValidationError(err)
+        )}`
+      );
+
+      res.status(400).json({
+        status: 400,
+        message: `Error while validating id for booking delete: ${JSON.stringify(
+          handleValidationError(err)
+        )}`,
+        data: null,
+      });
+      return;
+    }
+
+    console.log(`[error] Unexpected error: ${err}`);
+    res.status(500).json({
+      status: 500,
+      message: `Unexpected error occurred`,
+      data: null,
+    });
+  }
+};
+
+export { getAllBookings, getBooking, addBooking, deleteBooking };
