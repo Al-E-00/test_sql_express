@@ -28,7 +28,8 @@ export const BookingSchema = z.object({
   }),
   event: z.object({
     title: z.string().min(3),
-    locationId: ISO8601DateTime,
+    locationId: Id,
+    start: ISO8601DateTime,
     end: ISO8601DateTime,
     details: z.string().max(500),
   }),
