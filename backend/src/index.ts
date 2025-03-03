@@ -1,9 +1,7 @@
 import express, { Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-//TODO: remove import
-import db from './db';
-import { BookingSql } from './types/booking';
+import bookingRouter from './routes/bookings';
 
 const app = express();
 dotenv.config();
@@ -11,13 +9,10 @@ dotenv.config();
 // Setting up middlewares
 app.use(bodyParser.json());
 
-//TODO: remove, only to test db
-app.get('/', (req: Request, res: Response) => {
-  const sql = `SELECT * FROM bookings TABLE`;
+// It will automatically apply the initial route as /api/bookings
+app.use('/api/bookings', bookingRouter);
 
-  db.run(sql, [], (err: Error | null, rows: BookingSql[]) => {});
-});
-
+// Fallback for all the calls that don't respect a route
 app.use('/', (req: Request, res: Response) => {
   res.status(500).json({ message: 'Server OK' });
 });

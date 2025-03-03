@@ -21,18 +21,18 @@ export interface Booking {
 /* Flattened interface for sqlite DB types */
 export interface BookingSql {
   id: Id;
-  createdAt: ISO8601DateTime;
-  updatedAt: ISO8601DateTime;
-  orgId: Id;
-  status: BookingStatus;
+  created_at: ISO8601DateTime;
+  updated_at: ISO8601DateTime;
+  org_id: Id;
+  status_id: BookingStatus;
   contact_name: string;
   contact_email: string;
   event_title: string;
-  event_locationId: Id;
+  event_location_id: Id;
   event_start: ISO8601DateTime;
   event_end: ISO8601DateTime;
   event_details: string;
-  requestNote?: string;
+  request_note: string | null;
 }
 
 /** A UUID */

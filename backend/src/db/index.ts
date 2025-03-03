@@ -31,18 +31,18 @@ const createTables = async () => {
     // Create bookings table
     await dbRun(`CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL,
-      orgId TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      org_id TEXT NOT NULL,
       status_id INTEGER NOT NULL,
       contact_name TEXT NOT NULL,
       contact_email TEXT NOT NULL,
       event_title TEXT NOT NULL,
-      event_locationId TEXT NOT NULL,
+      event_location_id TEXT NOT NULL,
       event_start TEXT NOT NULL,
       event_end TEXT NOT NULL,
       event_details TEXT NOT NULL,
-      requestNote TEXT,
+      request_note TEXT,
       FOREIGN KEY (status_id)
         REFERENCES booking_status (id)
     )`);
