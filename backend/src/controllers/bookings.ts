@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
-import { convertDbBooking, handleValidationError } from '../utils';
+import {
+  convertDbBooking,
+  handleValidationError,
+  sendBookingConfirmationEmail,
+} from '../utils';
 import { v4 as uuidv4 } from 'uuid';
 
 import db from '../db';
@@ -196,7 +200,6 @@ const addBooking = (req: Request, res: Response) => {
   }
 };
 
-//TODO: I wanna display the deleted booking data
 // DELETE booking
 const deleteBooking = (req: Request, res: Response) => {
   const deleteSql = `DELETE FROM bookings WHERE id = ?`;
@@ -465,4 +468,90 @@ const editBooking = (req: Request, res: Response) => {
   }
 };
 
-export { getAllBookings, getBooking, addBooking, deleteBooking, editBooking };
+// APPROVE booking
+const approveBooking = (req: Request, res: Response) => {
+  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+
+  try {
+    const { id } = req.params;
+    const safeId = Id.parse(id);
+
+    db.get(getBookingSql, [safeId], async (err, row: BookingSql) => {
+      if (err) {
+        console.log(
+          `[error] Error while getting the booking id ${id}, ${err.message}`
+        );
+        res.status(500).json({
+          status: 500,
+          message: `Error while getting the booking id ${id}`,
+          data: null,
+        });
+        return;
+      }
+
+      // No booking found
+      if (!row) {
+        console.log(`[info] No booking id ${id} found`);
+        res.status(500).json({
+          status: 500,
+          message: `No booking id ${id} found`,
+          data: null,
+        });
+        return;
+      }
+
+      const bookingData = convertDbBooking(row);
+      // Send email
+      const emailSent = await sendBookingConfirmationEmail(bookingData);
+
+      if (!emailSent) {
+        res.status(500).json({
+          status: 500,
+          message: `Error while trying to send the email`,
+          data: null,
+        });
+
+        return;
+      }
+
+      res.status(200).json({
+        status: 200,
+        message: `Email correctly sent to email address: ${bookingData.contact.email}`,
+        data: bookingData,
+      });
+    });
+  } catch (err) {
+    // Handle zod errors
+    if (err instanceof z.ZodError) {
+      console.log(
+        `[error] Validation error: ${JSON.stringify(
+          handleValidationError(err)
+        )}`
+      );
+      res.status(400).json({
+        status: 400,
+        message: `Validation error: ${JSON.stringify(
+          handleValidationError(err)
+        )}`,
+        data: null,
+      });
+      return;
+    }
+
+    console.log(`[error] Unexpected error: ${err}`);
+    res.status(500).json({
+      status: 500,
+      message: `Unexpected error occurred`,
+      data: null,
+    });
+  }
+};
+
+export {
+  getAllBookings,
+  getBooking,
+  addBooking,
+  deleteBooking,
+  editBooking,
+  approveBooking,
+};
