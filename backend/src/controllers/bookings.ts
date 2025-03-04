@@ -9,7 +9,12 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../db';
 
 import { Booking, BookingSql, BookingStatus } from '../types/booking';
-import { BookingSqlSchema, Id } from '../models/bookings';
+import {
+  BookingSqlSchema,
+  BookingStatusSchema,
+  Id,
+  ISO8601DateTimeSchema,
+} from '../models/bookings';
 import { z } from 'zod';
 
 // GET bookings
@@ -469,14 +474,23 @@ const editBooking = (req: Request, res: Response) => {
 };
 
 // APPROVE booking
+// TODO: update approved state
 const approveBooking = (req: Request, res: Response) => {
   const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+  const updateBookingStatusSql = `UPDATE bookings SET
+    status_id = ?,
+    updated_at = ?
+  WHERE id = ?`;
 
   try {
     const { id } = req.params;
     const safeId = Id.parse(id);
+    const safeUpdatedDate = ISO8601DateTimeSchema.parse(
+      new Date().toISOString()
+    );
+    const safeBookingStatus = BookingStatusSchema.parse(BookingStatus.APPROVED);
 
-    db.get(getBookingSql, [safeId], async (err, row: BookingSql) => {
+    db.get(getBookingSql, [safeId], (err, row: BookingSql) => {
       if (err) {
         console.log(
           `[error] Error while getting the booking id ${id}, ${err.message}`
@@ -500,25 +514,69 @@ const approveBooking = (req: Request, res: Response) => {
         return;
       }
 
-      const bookingData = convertDbBooking(row);
-      // Send email
-      const emailSent = await sendBookingConfirmationEmail(bookingData);
-
-      if (!emailSent) {
-        res.status(500).json({
-          status: 500,
-          message: `Error while trying to send the email`,
+      if (row.status_id === BookingStatus.APPROVED) {
+        console.log(`[info] The booking id ${id} has already been approved`);
+        res.status(400).json({
+          status: 400,
+          message: `The booking id ${id} has already been approved`,
           data: null,
         });
-
         return;
       }
 
-      res.status(200).json({
-        status: 200,
-        message: `Email correctly sent to email address: ${bookingData.contact.email}`,
-        data: bookingData,
-      });
+      // Update status_id from PENDING to APPROVED
+      db.run(
+        updateBookingStatusSql,
+        [safeBookingStatus, safeUpdatedDate, safeId],
+        async function (err) {
+          if (err) {
+            console.log(
+              `[error] Error while updating the status_id of the booking id ${safeId}, ${err.message}`
+            );
+            res.status(500).json({
+              status: 500,
+              message: `Error while updating the status of the booking id ${safeId}`,
+              data: null,
+            });
+            return;
+          }
+
+          if (this.changes === 0) {
+            console.log(`[info] No booking id ${safeId} found`);
+            res.status(404).json({
+              status: 404,
+              message: `No booking id ${safeId} found`,
+              data: null,
+            });
+            return;
+          }
+
+          const bookingData = convertDbBooking({
+            ...row,
+            updated_at: safeUpdatedDate,
+            status_id: safeBookingStatus,
+          });
+
+          // Send email
+          const emailSent = await sendBookingConfirmationEmail(bookingData);
+
+          if (!emailSent) {
+            res.status(500).json({
+              status: 500,
+              message: `Error while trying to send the email`,
+              data: null,
+            });
+
+            return;
+          }
+
+          res.status(200).json({
+            status: 200,
+            message: `Email correctly sent to email address: ${bookingData.contact.email}`,
+            data: bookingData,
+          });
+        }
+      );
     });
   } catch (err) {
     // Handle zod errors
