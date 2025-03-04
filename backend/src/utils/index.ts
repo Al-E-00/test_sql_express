@@ -99,7 +99,6 @@ const prettyFormatDate = (date: string) => {
   }
 };
 
-//TODO: fetch data in email confirmation
 // Send booking confirmation email with mailgun
 const sendBookingConfirmationEmail = async (bookingData: Booking) => {
   const mailgun = new Mailgun(FormData);
