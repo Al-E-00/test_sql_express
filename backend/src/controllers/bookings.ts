@@ -200,37 +200,54 @@ const addBooking = (req: Request, res: Response) => {
 // DELETE booking
 const deleteBooking = (req: Request, res: Response) => {
   const deleteSql = `DELETE FROM bookings WHERE id = ?`;
+  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
 
   try {
     const { id } = req.params;
     const parsedId = Id.parse(id);
 
-    db.run(deleteSql, [parsedId], function (err) {
+    // Get the booking data to display
+    db.get(getBookingSql, [parsedId], (err, row: BookingSql) => {
       if (err) {
-        console.log(`[error] Error while deleting the booking id ${id}`);
+        console.log(
+          `[error] Error while getting the booking id: ${id}, error: ${err.message}`
+        );
         res.status(500).json({
           status: 500,
-          message: `Error while deleting booking id ${id}`,
+          message: `Error while getting booking id ${id}`,
           data: null,
         });
         return;
       }
 
-      if (this.changes === 0) {
-        console.log(`[info] No booking id ${id} found`);
+      db.run(deleteSql, [parsedId], function (err) {
+        if (err) {
+          console.log(`[error] Error while deleting the booking id ${id}`);
+          res.status(500).json({
+            status: 500,
+            message: `Error while deleting booking id ${id}`,
+            data: null,
+          });
+          return;
+        }
 
-        res.status(404).json({
-          status: 404,
-          message: `No booking id ${id} found`,
-          data: null,
+        if (this.changes === 0) {
+          console.log(`[info] No booking id ${id} found`);
+
+          res.status(404).json({
+            status: 404,
+            message: `No booking id ${id} found`,
+            data: null,
+          });
+          return;
+        }
+
+        const bookingData = convertDbBooking(row);
+        res.status(200).json({
+          status: 200,
+          message: `Booking id ${id} deleted`,
+          data: bookingData,
         });
-        return;
-      }
-
-      res.status(200).json({
-        status: 200,
-        message: `Booking id ${id} deleted`,
-        data: null,
       });
     });
   } catch (err) {
