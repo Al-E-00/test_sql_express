@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import db from '../db';
 import { Id, ISO8601DateTimeSchema } from '../models/bookings';
+import { Response } from 'express';
 
 // Get the internal private id for db operations
 const getPrivateId = async (
@@ -71,13 +72,12 @@ const convertDbBooking = (row: BookingSql): Booking => ({
 // Utility function for handling zod validation errors
 const handleValidationError = (error: z.ZodError) => {
   // User-friendly error structure
-  return error.errors.reduce((acc, curr) => {
-    const path = curr.path.join(',');
-    return {
-      ...acc,
-      [path]: curr.message,
-    };
-  }, {});
+  return error.errors
+    .reduce((acc, curr) => {
+      const path = curr.path.join(',');
+      return acc + `${path ? `${path}: ` : ''}${curr.message}, `;
+    }, '')
+    .slice(0, -2); // Remove the trailing comma and space
 };
 
 // Utility function to display data in an human readable way
@@ -152,10 +152,40 @@ const sendBookingConfirmationEmail = async (bookingData: Booking) => {
   }
 };
 
+type handleDatabaseErrorProps = {
+  res: Response;
+  operation?: string;
+  id?: string;
+  statusCode?: number;
+};
+
+const handleDatabaseError =
+  ({ res, operation, id, statusCode }: handleDatabaseErrorProps) =>
+  (err: Error) => {
+    const idMsg = id ? `${id}` : '';
+
+    // If no operation is passed down, display only the err.message
+    console.log(
+      `[error] ${
+        operation
+          ? `Error while ${operation}${idMsg}, error message: \n ${err.message}`
+          : err.message
+      }`
+    );
+    res.status(statusCode ?? 500).json({
+      status: statusCode ?? 500,
+      message: `${
+        operation ? `Error while ${operation}${idMsg}` : err.message
+      }`,
+      data: null,
+    });
+  };
+
 export {
   convertDbBooking,
   handleValidationError,
   sendBookingConfirmationEmail,
   getPrivateId,
   prettyFormatDate,
+  handleDatabaseError,
 };

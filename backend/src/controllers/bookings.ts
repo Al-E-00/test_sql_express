@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import {
   convertDbBooking,
   getPrivateId,
+  handleDatabaseError,
   handleValidationError,
   sendBookingConfirmationEmail,
 } from '../utils';
@@ -24,14 +25,7 @@ const getAllBookings = (req: Request, res: Response) => {
 
   db.all(getAllBookingSql, [], (err, rows: BookingSql[]) => {
     if (err) {
-      console.log(
-        `[error] Error while getting all the bookings: ${err.message}`
-      );
-      res.status(500).json({
-        status: 500,
-        message: 'Error while getting all the bookings from the database',
-        data: [],
-      });
+      handleDatabaseError({ res, operation: 'getting all the bookings' })(err);
       return;
     }
 
@@ -67,14 +61,11 @@ const getBooking = async (req: Request, res: Response) => {
 
     db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
-        console.log(
-          `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
-        );
-        res.status(500).json({
-          status: 500,
-          message: `Error while getting booking id: ${id}`,
-          data: [],
-        });
+        handleDatabaseError({
+          res,
+          operation: 'getting the booking with id:',
+          id: parsedId,
+        })(err);
         return;
       }
 
@@ -99,30 +90,16 @@ const getBooking = async (req: Request, res: Response) => {
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
-      console.log(
-        `[error] Error while validating id: ${JSON.stringify(
-          handleValidationError(err)
-        )}`
-      );
-
-      res.status(400).json({
-        status: 400,
-        message: `Error while validating id: ${JSON.stringify(
-          handleValidationError(err)
-        )}`,
-        data: null,
-      });
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
     if (err instanceof Error) {
-      console.log(`[error] ${err}`);
-
-      res.status(500).json({
-        status: 500,
-        message: `${err}`,
-        data: null,
-      });
+      handleDatabaseError({ res })(err);
       return;
     }
 
@@ -176,12 +153,7 @@ const addBooking = (req: Request, res: Response) => {
 
     db.run(addBookingSql, [...Object.values(safeBookingData)], (err) => {
       if (err) {
-        console.log(`[error] Error while adding a new booking: ${err.message}`);
-        res.status(500).json({
-          status: 500,
-          message: `Error while adding a new booking`,
-          data: null,
-        });
+        handleDatabaseError({ res, operation: 'adding a new booking' })(err);
         return;
       }
 
@@ -194,18 +166,11 @@ const addBooking = (req: Request, res: Response) => {
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
-      console.log(
-        `[error] Validation error: ${JSON.stringify(
-          handleValidationError(err)
-        )}`
-      );
-      res.status(400).json({
-        status: 400,
-        message: `Validation error: ${JSON.stringify(
-          handleValidationError(err)
-        )}`,
-        data: null,
-      });
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
@@ -231,25 +196,21 @@ const deleteBooking = async (req: Request, res: Response) => {
     // Get the booking data to display
     db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
-        console.log(
-          `[error] Error while getting the booking id: ${id}, error: ${err.message}`
-        );
-        res.status(500).json({
-          status: 500,
-          message: `Error while getting booking id ${id}`,
-          data: null,
-        });
+        handleDatabaseError({
+          res,
+          operation: 'getting the booking with id:',
+          id: parsedId,
+        })(err);
         return;
       }
 
       db.run(deleteSql, [privateId], function (err) {
         if (err) {
-          console.log(`[error] Error while deleting the booking id ${id}`);
-          res.status(500).json({
-            status: 500,
-            message: `Error while deleting booking id ${id}`,
-            data: null,
-          });
+          handleDatabaseError({
+            res,
+            operation: 'deleting the booking with id:',
+            id: parsedId,
+          })(err);
           return;
         }
 
@@ -275,30 +236,16 @@ const deleteBooking = async (req: Request, res: Response) => {
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
-      console.log(
-        `[error] Error while validating id for booking delete: ${JSON.stringify(
-          handleValidationError(err)
-        )}`
-      );
-
-      res.status(400).json({
-        status: 400,
-        message: `Error while validating id for booking delete: ${JSON.stringify(
-          handleValidationError(err)
-        )}`,
-        data: null,
-      });
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
     if (err instanceof Error) {
-      console.log(`[error] ${err}`);
-
-      res.status(500).json({
-        status: 500,
-        message: `${err}`,
-        data: null,
-      });
+      handleDatabaseError({ res })(err);
       return;
     }
 
@@ -334,14 +281,11 @@ const editBooking = async (req: Request, res: Response) => {
 
     db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
-        console.log(
-          `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
-        );
-        res.status(500).json({
-          status: 500,
-          message: `Error while getting booking id: ${id}`,
-          data: [],
-        });
+        handleDatabaseError({
+          res,
+          operation: 'getting the booking with id:',
+          id: parsedId,
+        })(err);
         return;
       }
 
@@ -420,14 +364,11 @@ const editBooking = async (req: Request, res: Response) => {
           ],
           function (err) {
             if (err) {
-              console.log(
-                `[error] Error while editing booking id${id}: ${err.message}`
-              );
-              res.status(500).json({
-                status: 500,
-                message: `Error while editing booking id ${id}`,
-                data: null,
-              });
+              handleDatabaseError({
+                res,
+                operation: 'editing the booking with id:',
+                id: parsedId,
+              })(err);
               return;
             }
 
@@ -452,19 +393,11 @@ const editBooking = async (req: Request, res: Response) => {
       } catch (err) {
         // Handle zod errors
         if (err instanceof z.ZodError) {
-          console.log(
-            `[error] Error while validating booking data: ${JSON.stringify(
-              handleValidationError(err)
-            )}`
-          );
-
-          res.status(400).json({
-            status: 400,
-            message: `Error while validating booking data: ${JSON.stringify(
-              handleValidationError(err)
-            )}`,
-            data: null,
-          });
+          handleDatabaseError({
+            res,
+            operation: `validating data, ${handleValidationError(err)}`,
+            statusCode: 400,
+          })(err);
           return;
         }
 
@@ -480,30 +413,16 @@ const editBooking = async (req: Request, res: Response) => {
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
-      console.log(
-        `[error] Error while validating id: ${JSON.stringify(
-          handleValidationError(err)
-        )}`
-      );
-
-      res.status(400).json({
-        status: 400,
-        message: `Error while validating id: ${JSON.stringify(
-          handleValidationError(err)
-        )}`,
-        data: null,
-      });
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
     if (err instanceof Error) {
-      console.log(`[error] ${err}`);
-
-      res.status(500).json({
-        status: 500,
-        message: `${err}`,
-        data: null,
-      });
+      handleDatabaseError({ res })(err);
       return;
     }
 
@@ -538,14 +457,11 @@ const approveBooking = async (req: Request, res: Response) => {
 
     db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
-        console.log(
-          `[error] Error while getting the booking id ${id}, ${err.message}`
-        );
-        res.status(500).json({
-          status: 500,
-          message: `Error while getting the booking id ${id}`,
-          data: null,
-        });
+        handleDatabaseError({
+          res,
+          operation: 'getting the booking with id:',
+          id: parsedId,
+        })(err);
         return;
       }
 
@@ -576,14 +492,11 @@ const approveBooking = async (req: Request, res: Response) => {
         [safeBookingStatus, safeUpdatedDate, privateId],
         async function (err) {
           if (err) {
-            console.log(
-              `[error] Error while updating the status_id of the booking id ${parsedId}, ${err.message}`
-            );
-            res.status(500).json({
-              status: 500,
-              message: `Error while updating the status of the booking id ${parsedId}`,
-              data: null,
-            });
+            handleDatabaseError({
+              res,
+              operation: 'updating the status_id of the booking id:',
+              id: parsedId,
+            })(err);
             return;
           }
 
@@ -627,29 +540,16 @@ const approveBooking = async (req: Request, res: Response) => {
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
-      console.log(
-        `[error] Validation error: ${JSON.stringify(
-          handleValidationError(err)
-        )}`
-      );
-      res.status(400).json({
-        status: 400,
-        message: `Validation error: ${JSON.stringify(
-          handleValidationError(err)
-        )}`,
-        data: null,
-      });
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
     if (err instanceof Error) {
-      console.log(`[error] ${err}`);
-
-      res.status(500).json({
-        status: 500,
-        message: `${err}`,
-        data: null,
-      });
+      handleDatabaseError({ res })(err);
       return;
     }
 
