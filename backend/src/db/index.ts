@@ -29,9 +29,9 @@ const createTables = async () => {
     console.log(`[info] booking_status table created`);
 
     // Create bookings table
-    // TODO: implement internal id for database operations
     await dbRun(`CREATE TABLE IF NOT EXISTS bookings (
-      id TEXT PRIMARY KEY,
+      private_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       org_id TEXT NOT NULL,

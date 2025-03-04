@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import {
   convertDbBooking,
+  getPrivateId,
   handleValidationError,
   sendBookingConfirmationEmail,
 } from '../utils';
@@ -56,14 +57,15 @@ const getAllBookings = (req: Request, res: Response) => {
 };
 
 // GET booking
-const getBooking = (req: Request, res: Response) => {
-  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+const getBooking = async (req: Request, res: Response) => {
+  const getBookingSql = `SELECT * FROM bookings WHERE private_id = ?`;
   const { id } = req.params;
 
   try {
     const parsedId = Id.parse(id);
+    const privateId = await getPrivateId(parsedId);
 
-    db.get(getBookingSql, [parsedId], (err, row: BookingSql) => {
+    db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
         console.log(
           `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
@@ -113,11 +115,22 @@ const getBooking = (req: Request, res: Response) => {
       return;
     }
 
-    console.log(`[error] Database error ${err}`);
+    if (err instanceof Error) {
+      console.log(`[error] ${err}`);
+
+      res.status(500).json({
+        status: 500,
+        message: `${err}`,
+        data: null,
+      });
+      return;
+    }
+
+    console.log(`[error] Database error: ${err}`);
 
     res.status(500).json({
       status: 500,
-      message: `Database error `,
+      message: `Database error: ${err}`,
       data: null,
     });
     return;
@@ -206,16 +219,17 @@ const addBooking = (req: Request, res: Response) => {
 };
 
 // DELETE booking
-const deleteBooking = (req: Request, res: Response) => {
-  const deleteSql = `DELETE FROM bookings WHERE id = ?`;
-  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+const deleteBooking = async (req: Request, res: Response) => {
+  const deleteSql = `DELETE FROM bookings WHERE private_id = ?`;
+  const getBookingSql = `SELECT * FROM bookings WHERE private_id = ?`;
 
   try {
     const { id } = req.params;
     const parsedId = Id.parse(id);
+    const privateId = await getPrivateId(parsedId);
 
     // Get the booking data to display
-    db.get(getBookingSql, [parsedId], (err, row: BookingSql) => {
+    db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
         console.log(
           `[error] Error while getting the booking id: ${id}, error: ${err.message}`
@@ -228,7 +242,7 @@ const deleteBooking = (req: Request, res: Response) => {
         return;
       }
 
-      db.run(deleteSql, [parsedId], function (err) {
+      db.run(deleteSql, [privateId], function (err) {
         if (err) {
           console.log(`[error] Error while deleting the booking id ${id}`);
           res.status(500).json({
@@ -277,6 +291,17 @@ const deleteBooking = (req: Request, res: Response) => {
       return;
     }
 
+    if (err instanceof Error) {
+      console.log(`[error] ${err}`);
+
+      res.status(500).json({
+        status: 500,
+        message: `${err}`,
+        data: null,
+      });
+      return;
+    }
+
     console.log(`[error] Unexpected error: ${err}`);
     res.status(500).json({
       status: 500,
@@ -287,8 +312,8 @@ const deleteBooking = (req: Request, res: Response) => {
 };
 
 // PATCH booking
-const editBooking = (req: Request, res: Response) => {
-  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+const editBooking = async (req: Request, res: Response) => {
+  const getBookingSql = `SELECT * FROM bookings WHERE private_id = ?`;
   const editBookingSql = `UPDATE bookings SET
       updated_at = ?,
       status_id = ?,
@@ -299,14 +324,15 @@ const editBooking = (req: Request, res: Response) => {
       event_end = ?,
       event_details = ?,
       request_note = ?
-    WHERE id = ?`;
+    WHERE private_id = ?`;
 
   const { id } = req.params;
 
   try {
     const parsedId = Id.parse(id);
+    const privateId = await getPrivateId(parsedId);
 
-    db.get(getBookingSql, [parsedId], (err, row: BookingSql) => {
+    db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
         console.log(
           `[error] Error while getting the booking with id: ${id}, error message: ${err.message}`
@@ -390,7 +416,7 @@ const editBooking = (req: Request, res: Response) => {
             safeData.event_end,
             safeData.event_details,
             safeData.request_note,
-            safeData.id,
+            privateId,
           ],
           function (err) {
             if (err) {
@@ -441,6 +467,14 @@ const editBooking = (req: Request, res: Response) => {
           });
           return;
         }
+
+        console.log(`[error] Database error: ${err}`);
+        res.status(500).json({
+          status: 500,
+          message: `Database error occurred`,
+          data: null,
+        });
+        return;
       }
     });
   } catch (err) {
@@ -462,6 +496,17 @@ const editBooking = (req: Request, res: Response) => {
       return;
     }
 
+    if (err instanceof Error) {
+      console.log(`[error] ${err}`);
+
+      res.status(500).json({
+        status: 500,
+        message: `${err}`,
+        data: null,
+      });
+      return;
+    }
+
     console.log(`[error] Database error ${err}`);
 
     res.status(500).json({
@@ -474,23 +519,24 @@ const editBooking = (req: Request, res: Response) => {
 };
 
 // APPROVE booking
-// TODO: update approved state
-const approveBooking = (req: Request, res: Response) => {
-  const getBookingSql = `SELECT * FROM bookings WHERE id = ?`;
+const approveBooking = async (req: Request, res: Response) => {
+  const getBookingSql = `SELECT * FROM bookings WHERE private_id = ?`;
   const updateBookingStatusSql = `UPDATE bookings SET
     status_id = ?,
     updated_at = ?
-  WHERE id = ?`;
+  WHERE private_id = ?`;
 
   try {
     const { id } = req.params;
-    const safeId = Id.parse(id);
+    const parsedId = Id.parse(id);
+    const privateId = await getPrivateId(parsedId);
+
     const safeUpdatedDate = ISO8601DateTimeSchema.parse(
       new Date().toISOString()
     );
     const safeBookingStatus = BookingStatusSchema.parse(BookingStatus.APPROVED);
 
-    db.get(getBookingSql, [safeId], (err, row: BookingSql) => {
+    db.get(getBookingSql, [privateId], (err, row: BookingSql) => {
       if (err) {
         console.log(
           `[error] Error while getting the booking id ${id}, ${err.message}`
@@ -527,25 +573,25 @@ const approveBooking = (req: Request, res: Response) => {
       // Update status_id from PENDING to APPROVED
       db.run(
         updateBookingStatusSql,
-        [safeBookingStatus, safeUpdatedDate, safeId],
+        [safeBookingStatus, safeUpdatedDate, privateId],
         async function (err) {
           if (err) {
             console.log(
-              `[error] Error while updating the status_id of the booking id ${safeId}, ${err.message}`
+              `[error] Error while updating the status_id of the booking id ${parsedId}, ${err.message}`
             );
             res.status(500).json({
               status: 500,
-              message: `Error while updating the status of the booking id ${safeId}`,
+              message: `Error while updating the status of the booking id ${parsedId}`,
               data: null,
             });
             return;
           }
 
           if (this.changes === 0) {
-            console.log(`[info] No booking id ${safeId} found`);
+            console.log(`[info] No booking id ${parsedId} found`);
             res.status(404).json({
               status: 404,
-              message: `No booking id ${safeId} found`,
+              message: `No booking id ${parsedId} found`,
               data: null,
             });
             return;
@@ -591,6 +637,17 @@ const approveBooking = (req: Request, res: Response) => {
         message: `Validation error: ${JSON.stringify(
           handleValidationError(err)
         )}`,
+        data: null,
+      });
+      return;
+    }
+
+    if (err instanceof Error) {
+      console.log(`[error] ${err}`);
+
+      res.status(500).json({
+        status: 500,
+        message: `${err}`,
         data: null,
       });
       return;

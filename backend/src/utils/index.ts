@@ -1,8 +1,53 @@
 import { z } from 'zod';
-import { Booking, BookingSql } from '../types/booking';
+import { Booking, BookingSql, InternalBookingSql } from '../types/booking';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
+import db from '../db';
+import { Id } from '../models/bookings';
 
+//Get the internal private id for db operations
+const getPrivateId = async (
+  id: BookingSql['id']
+): Promise<InternalBookingSql['private_id']> => {
+  const getInternalIdSql = `SELECT private_id FROM bookings WHERE id = ?`;
+
+  return new Promise((resolve, reject) => {
+    try {
+      const safeId = Id.parse(id);
+      db.get(getInternalIdSql, [safeId], (err, row: InternalBookingSql) => {
+        if (err) {
+          console.log(`[error] Error while getting private_id, ${err.message}`);
+          reject(new Error(`Error while getting private_id, ${err.message}`));
+          return;
+        }
+
+        if (!row) {
+          console.log(`[info] No booking id ${safeId} found`);
+          reject(new Error(`No booking id ${safeId} found`));
+          return;
+        }
+
+        resolve(row.private_id);
+      });
+    } catch (err) {
+      // Handle zod errors
+      if (err instanceof z.ZodError) {
+        reject(
+          new Error(
+            `[error] Error while validating id: ${JSON.stringify(
+              handleValidationError(err)
+            )}`
+          )
+        );
+        return;
+      }
+
+      reject(new Error(`[error] Generic error ${err}`));
+    }
+  });
+};
+
+// Convert from BookingSql type to the Booking type
 const convertDbBooking = (row: BookingSql): Booking => ({
   id: row.id,
   createdAt: row.created_at,
@@ -35,6 +80,8 @@ const handleValidationError = (error: z.ZodError) => {
   }, {});
 };
 
+//TODO: fetch data in email confirmation
+// Send booking confirmation email with mailgun
 const sendBookingConfirmationEmail = async (bookingData: Booking) => {
   const mailgun = new Mailgun(FormData);
   const mg = mailgun.client({
@@ -89,4 +136,5 @@ export {
   convertDbBooking,
   handleValidationError,
   sendBookingConfirmationEmail,
+  getPrivateId,
 };

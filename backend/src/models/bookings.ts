@@ -52,3 +52,7 @@ export const BookingSqlSchema = z.object({
   event_details: z.string().max(500),
   request_note: z.string().optional(),
 });
+
+export const InternalBookingSqlSchema = BookingSqlSchema.extend({
+  private_id: z.number(),
+});
