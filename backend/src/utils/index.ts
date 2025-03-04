@@ -3,9 +3,9 @@ import { Booking, BookingSql, InternalBookingSql } from '../types/booking';
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import db from '../db';
-import { Id } from '../models/bookings';
+import { Id, ISO8601DateTimeSchema } from '../models/bookings';
 
-//Get the internal private id for db operations
+// Get the internal private id for db operations
 const getPrivateId = async (
   id: BookingSql['id']
 ): Promise<InternalBookingSql['private_id']> => {
@@ -80,6 +80,25 @@ const handleValidationError = (error: z.ZodError) => {
   }, {});
 };
 
+// Utility function to display data in an human readable way
+const prettyFormatDate = (date: string) => {
+  try {
+    const parsedData = ISO8601DateTimeSchema.parse(date);
+    const safeDate = new Date(parsedData);
+
+    return safeDate.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (err) {
+    console.log(`[error] Error while formatting the data: ${err}`);
+    return null;
+  }
+};
+
 //TODO: fetch data in email confirmation
 // Send booking confirmation email with mailgun
 const sendBookingConfirmationEmail = async (bookingData: Booking) => {
@@ -104,7 +123,9 @@ const sendBookingConfirmationEmail = async (bookingData: Booking) => {
         Your room booking has been confirmed. Here are the details of your reservation:
 
         Event: ${bookingData.event.title}
-        Date: ${bookingData.event.start} to ${bookingData.event.end}
+        Date: ${prettyFormatDate(
+          bookingData.event.start
+        )} to ${prettyFormatDate(bookingData.event.end)}
         Details: ${bookingData.event.details}
         ${
           bookingData.requestNote
@@ -137,4 +158,5 @@ export {
   handleValidationError,
   sendBookingConfirmationEmail,
   getPrivateId,
+  prettyFormatDate,
 };
