@@ -2,6 +2,7 @@ import express from 'express';
 import {
   addBooking,
   deleteBooking,
+  editBooking,
   getAllBookings,
   getBooking,
 } from '../controllers/bookings';
@@ -13,5 +14,6 @@ bookingRouter.get('/', getAllBookings);
 bookingRouter.get('/:id', getBooking);
 bookingRouter.post('/', addBooking);
 bookingRouter.delete('/:id', deleteBooking);
+bookingRouter.patch('/:id', editBooking);
 
 export default bookingRouter;

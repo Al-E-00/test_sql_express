@@ -18,10 +18,7 @@ const convertDbBooking = (row: BookingSql): Booking => ({
     end: row.event_end,
     details: row.event_details,
   },
-  requestNote:
-    row.request_note === null || row.request_note.length === 0
-      ? undefined
-      : row.request_note,
+  requestNote: row.request_note === null ? undefined : row.request_note,
 });
 
 // Utility function for handling validation errors

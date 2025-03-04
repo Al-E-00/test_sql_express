@@ -32,8 +32,8 @@ const createTables = async () => {
     // TODO: implement internal id for database operations
     await dbRun(`CREATE TABLE IF NOT EXISTS bookings (
       id TEXT PRIMARY KEY,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
       org_id TEXT NOT NULL,
       status_id INTEGER NOT NULL,
       contact_name TEXT NOT NULL,

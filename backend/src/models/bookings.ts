@@ -10,7 +10,7 @@ const ISO8601DateTime = z
   .refine((str) => !isNaN(Date.parse(str)), {
     message: 'Invalid date format',
   })
-  .transform((str) => new Date(str));
+  .transform((str) => new Date(str).toISOString().split('.')[0] + 'Z');
 
 // booking_status table schema
 export const BookingStatusSchema = z.nativeEnum(BookingStatus);
@@ -37,8 +37,10 @@ export const BookingSchema = z.object({
 });
 
 // Schema for booking db input
-export const BookingInputSchema = z.object({
+export const BookingSqlSchema = z.object({
   id: Id,
+  created_at: ISO8601DateTime,
+  updated_at: ISO8601DateTime,
   org_id: Id,
   status_id: BookingStatusSchema,
   contact_name: z.string().min(2),
@@ -48,11 +50,5 @@ export const BookingInputSchema = z.object({
   event_start: ISO8601DateTime,
   event_end: ISO8601DateTime,
   event_details: z.string().max(500),
-  request_note: z.string().nullable(),
-});
-
-// schema for db output
-export const BookingSqlSchema = BookingInputSchema.extend({
-  created_at: ISO8601DateTime,
-  updated_at: ISO8601DateTime,
+  request_note: z.string().optional(),
 });
