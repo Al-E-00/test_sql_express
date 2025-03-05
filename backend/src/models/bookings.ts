@@ -58,4 +58,7 @@ export const InternalBookingSqlSchema = BookingSqlSchema.extend({
 });
 
 // It's not a large database, assume max 200 is enough
-export const PaginationOffset = z.number().min(0).max(200);
+export const PaginationSchema = {
+  offset: z.number().min(0).max(200).default(0),
+  limit: z.number().min(1).max(20).default(5),
+};

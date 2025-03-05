@@ -16,7 +16,7 @@ import {
   BookingStatusSchema,
   Id,
   ISO8601DateTimeSchema,
-  PaginationOffset,
+  PaginationSchema,
 } from '../models/bookings';
 import { z } from 'zod';
 
@@ -24,39 +24,44 @@ import { z } from 'zod';
 const getAllBookings = (req: Request, res: Response) => {
   const getAllBookingSql = `SELECT * FROM bookings
     ORDER BY updated_at DESC
-    LIMIT 5 OFFSET ?`;
+    LIMIT ? OFFSET ?`;
 
   try {
-    const { offset } = req.body;
-    const parsedOffset = PaginationOffset.parse(offset);
+    const { offset, limit } = req.body;
+    const parsedOffset = PaginationSchema.offset.parse(offset);
+    const parsedLimit = PaginationSchema.limit.parse(limit);
 
-    db.all(getAllBookingSql, [parsedOffset], (err, rows: BookingSql[]) => {
-      if (err) {
-        handleDatabaseError({ res, operation: 'getting all the bookings' })(
-          err
-        );
-        return;
-      }
+    db.all(
+      getAllBookingSql,
+      [parsedLimit, parsedOffset],
+      (err, rows: BookingSql[]) => {
+        if (err) {
+          handleDatabaseError({ res, operation: 'getting all the bookings' })(
+            err
+          );
+          return;
+        }
 
-      // No data in the database
-      if (!rows || rows.length === 0) {
-        console.log(`[info] No data in the bookings table`);
-        res.status(404).json({
-          status: 404,
-          message: 'No data in the bookings table',
-          data: [],
+        // No data in the database
+        if (!rows || rows.length === 0) {
+          console.log(`[info] No data in the bookings table`);
+          res.status(404).json({
+            status: 404,
+            message: 'No data in the bookings table',
+            data: [],
+          });
+          return;
+        }
+
+        const data: Booking[] = rows.map((row) => convertDbBooking(row));
+
+        res.status(200).json({
+          status: 200,
+          message: `All data from bookings table retrieved`,
+          data,
         });
-        return;
       }
-
-      const data: Booking[] = rows.map((row) => convertDbBooking(row));
-
-      res.status(200).json({
-        status: 200,
-        message: `All data from bookings table retrieved`,
-        data,
-      });
-    });
+    );
   } catch (err) {
     // Handle zod errors
     if (err instanceof z.ZodError) {
