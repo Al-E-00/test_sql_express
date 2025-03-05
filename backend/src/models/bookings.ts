@@ -56,3 +56,6 @@ export const BookingSqlSchema = z.object({
 export const InternalBookingSqlSchema = BookingSqlSchema.extend({
   private_id: z.number(),
 });
+
+// It's not a large database, assume max 200 is enough
+export const PaginationOffset = z.number().min(0).max(200);

@@ -16,38 +16,72 @@ import {
   BookingStatusSchema,
   Id,
   ISO8601DateTimeSchema,
+  PaginationOffset,
 } from '../models/bookings';
 import { z } from 'zod';
 
 // GET bookings
 const getAllBookings = (req: Request, res: Response) => {
-  const getAllBookingSql = `SELECT * FROM bookings`;
+  const getAllBookingSql = `SELECT * FROM bookings
+    ORDER BY updated_at DESC
+    LIMIT 5 OFFSET ?`;
 
-  db.all(getAllBookingSql, [], (err, rows: BookingSql[]) => {
-    if (err) {
-      handleDatabaseError({ res, operation: 'getting all the bookings' })(err);
-      return;
-    }
+  try {
+    const { offset } = req.body;
+    const parsedOffset = PaginationOffset.parse(offset);
 
-    // No data in the database
-    if (!rows || rows.length === 0) {
-      console.log(`[info] No data in the bookings table`);
-      res.status(404).json({
-        status: 404,
-        message: 'No data in the bookings table',
-        data: [],
+    db.all(getAllBookingSql, [parsedOffset], (err, rows: BookingSql[]) => {
+      if (err) {
+        handleDatabaseError({ res, operation: 'getting all the bookings' })(
+          err
+        );
+        return;
+      }
+
+      // No data in the database
+      if (!rows || rows.length === 0) {
+        console.log(`[info] No data in the bookings table`);
+        res.status(404).json({
+          status: 404,
+          message: 'No data in the bookings table',
+          data: [],
+        });
+        return;
+      }
+
+      const data: Booking[] = rows.map((row) => convertDbBooking(row));
+
+      res.status(200).json({
+        status: 200,
+        message: `All data from bookings table retrieved`,
+        data,
       });
+    });
+  } catch (err) {
+    // Handle zod errors
+    if (err instanceof z.ZodError) {
+      handleDatabaseError({
+        res,
+        operation: `validating data, ${handleValidationError(err)}`,
+        statusCode: 400,
+      })(err);
       return;
     }
 
-    const data: Booking[] = rows.map((row) => convertDbBooking(row));
+    if (err instanceof Error) {
+      handleDatabaseError({ res })(err);
+      return;
+    }
 
-    res.status(200).json({
-      status: 200,
-      message: `All data from bookings table retrieved`,
-      data,
+    console.log(`[error] Database error: ${err}`);
+
+    res.status(500).json({
+      status: 500,
+      message: `Database error: ${err}`,
+      data: null,
     });
-  });
+    return;
+  }
 };
 
 // GET booking
