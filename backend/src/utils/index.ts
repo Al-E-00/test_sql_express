@@ -1,10 +1,9 @@
-import { z } from 'zod';
-import { Booking, BookingSql, InternalBookingSql } from '../types/booking';
-import FormData from 'form-data';
-import Mailgun from 'mailgun.js';
-import db from '../db';
-import { Id, ISO8601DateTimeSchema } from '../models/bookings';
 import { Response } from 'express';
+import { z } from 'zod';
+import db from '../db';
+
+import { Booking, BookingSql, InternalBookingSql } from '../types/booking';
+import { Id, ISO8601DateTimeSchema } from '../models/bookings';
 
 // Get the internal private id for db operations
 const getPrivateId = async (
@@ -99,84 +98,45 @@ const prettyFormatDate = (date: string) => {
   }
 };
 
-// Send booking confirmation email with mailgun
-const sendBookingConfirmationEmail = async (bookingData: Booking) => {
-  const mailgun = new Mailgun(FormData);
-  const mg = mailgun.client({
-    username: process.env.MAILGUN_USERNAME || 'api',
-    key: process.env.MAILGUN_API || 'API_KEY',
-  });
-
-  const mailgunDomain =
-    process.env.MAILGUN_DOMAIN ||
-    'sandbox3e3b7c05691c447685c33a057e28fff0.mailgun.org';
-
-  try {
-    const data = await mg.messages.create(mailgunDomain, {
-      from: `Prospero Bookings <postmaster@${mailgunDomain}>`,
-      to: [`${bookingData.contact.name} <${bookingData.contact.email}>`],
-      subject: `Booking Confirmation - ${bookingData.event.title}`,
-      text: `
-        Dear ${bookingData.contact.name},
-
-        Your room booking has been confirmed. Here are the details of your reservation:
-
-        Event: ${bookingData.event.title}
-        Date: ${prettyFormatDate(
-          bookingData.event.start
-        )} to ${prettyFormatDate(bookingData.event.end)}
-        Details: ${bookingData.event.details}
-        ${
-          bookingData.requestNote
-            ? `\nAdditional Notes: ${bookingData.requestNote}`
-            : ''
-        }
-
-        If you need to make any changes to your booking or have any questions, please don't hesitate to contact us.
-
-        Thank you for your booking!
-
-        Best regards,
-        Prospero`,
-    });
-
-    console.log(
-      `[info] Mailgun email sent to ${
-        bookingData.contact.email
-      }, mailgun details: ${JSON.stringify(data)}`
-    );
-    return true; // Signal that the email has been correctly sent
-  } catch (err) {
-    console.log(`[error] Mailgun error: ${err}`);
-    return false; // Signal that we have an error
-  }
-};
-
-type handleDatabaseErrorProps = {
+// Handles the backend errors
+type handleErrorsProps = {
   res: Response;
   operation?: string;
   id?: string;
   statusCode?: number;
 };
 
-const handleDatabaseError =
-  ({ res, operation, id, statusCode }: handleDatabaseErrorProps) =>
-  (err: Error) => {
-    const idMsg = id ? `${id}` : '';
+const handleErrors =
+  ({ res, operation, id, statusCode }: handleErrorsProps) =>
+  (err: Error | unknown) => {
+    // Extract and normalize error message
+    const getErrorMessage = () => {
+      if (err instanceof z.ZodError) return handleValidationError(err);
+      if (err instanceof Error) return err.message;
+      return String(err);
+    };
 
-    // If no operation is passed down, display only the err.message
-    console.log(
-      `[error] ${
-        operation
-          ? `Error while ${operation}${idMsg}, error message: \n ${err.message}`
-          : err.message
-      }`
-    );
+    const operationContext = operation
+      ? `Error while ${operation}${id ? ` ${id}` : ''}`
+      : '';
+    const errorMessage = getErrorMessage();
+
+    // Construct log message
+    const logMessage = operationContext
+      ? `${operationContext}${
+          errorMessage ? `, error message: \n ${errorMessage}` : ''
+        }`
+      : errorMessage;
+
+    // Log the error
+    console.log(`[error] ${logMessage}`);
+
+    // Send error response
     res.status(statusCode ?? 500).json({
       status: statusCode ?? 500,
-      message: `${
-        operation ? `Error while ${operation}${idMsg}` : err.message
-      }`,
+      message: operationContext
+        ? `${operationContext}${errorMessage ? `: ${errorMessage}` : ''}`
+        : errorMessage,
       data: null,
     });
   };
@@ -184,8 +144,7 @@ const handleDatabaseError =
 export {
   convertDbBooking,
   handleValidationError,
-  sendBookingConfirmationEmail,
   getPrivateId,
   prettyFormatDate,
-  handleDatabaseError,
+  handleErrors,
 };
